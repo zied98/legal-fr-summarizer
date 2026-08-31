@@ -59,6 +59,9 @@ N_EVAL = int(os.environ.get("N_EVAL", "150"))
 #: Baseline déjà mesurée lors d'un run précédent : évite de repayer 19 min de
 #: GPU pour un résultat connu. Vide = on la recalcule.
 BASELINE_CONNUE = os.environ.get("BASELINE_CONNUE", "")
+#: Limite le jeu d'entraînement. Sert au smoke test : valider le pipeline
+#: complet en quelques minutes avant d'engager une heure de GPU.
+N_TRAIN_MAX = int(os.environ.get("N_TRAIN_MAX", "0")) or None
 EPOQUES = float(os.environ.get("EPOQUES", "2"))
 LORA_R = int(os.environ.get("LORA_R", "16"))
 LORA_ALPHA = int(os.environ.get("LORA_ALPHA", "32"))
@@ -236,6 +239,9 @@ def main() -> None:
 
     donnees = load_dataset(DATASET_TRAVAIL)
     train = donnees["train"]
+    if N_TRAIN_MAX:
+        train = train.select(range(min(N_TRAIN_MAX, len(train))))
+        print(f"⚠️  SMOKE TEST : entraînement limité à {len(train)} exemples", flush=True)
     test = donnees["test"].select(range(min(N_EVAL, len(donnees["test"]))))
 
     prompts_test = list(test["prompt"])
