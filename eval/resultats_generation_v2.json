@@ -1,0 +1,35 @@
+{
+  "experience": "Reevaluation du MEME adaptateur avec des parametres de generation differents. Aucun reentrainement. Objectif : verifier que la regression de validite JSON venait de la generation et non de l'entrainement.",
+  "adaptateur": "ZiedBz/legal-fr-cassation-qwen3-4b-lora",
+  "n": 100,
+  "materiel": "1x NVIDIA L4 24GB",
+  "config_A": {
+    "max_new_tokens": 700,
+    "repetition_penalty": null,
+    "json_valide": 0.95,
+    "schema_valide": 0.95,
+    "solution_exacte": 0.9684,
+    "formation_exacte": 1.0,
+    "articles_jaccard": 0.3237,
+    "resume_rouge_l": 0.5497
+  },
+  "config_B": {
+    "max_new_tokens": 900,
+    "repetition_penalty": 1.1,
+    "json_valide": 1.0,
+    "schema_valide": 1.0,
+    "solution_exacte": 0.97,
+    "formation_exacte": 1.0,
+    "articles_jaccard": 0.252,
+    "resume_rouge_l": 0.5237
+  },
+  "delta_B_moins_A": {
+    "json_valide": 0.05,
+    "schema_valide": 0.05,
+    "solution_exacte": 0.0016,
+    "formation_exacte": 0.0,
+    "articles_jaccard": -0.0717,
+    "resume_rouge_l": -0.0259
+  },
+  "conclusion": "Hypothese confirmee : la regression JSON venait des parametres de generation. Mais la correction a un cout. repetition_penalty degrade la fidelite (-7,2 pts sur les articles vises) car un sommaire juridique repete necessairement les termes de l'arret et une liste de visas contient plusieurs fois 'article ... du code ...'. Ce n'est donc pas une amelioration mais un arbitrage : (B) pour un pipeline automatise, (A) si un juriste relit. Prochaine experience a mener : max_new_tokens=900 SANS repetition_penalty, qui devrait resoudre la troncature sans payer le cout de la penalite."
+}
