@@ -16,18 +16,25 @@ Le jeu de test n'est jamais vu pendant l'entraînement.
 # requires-python = ">=3.10"
 # dependencies = [
 #   "torch",
-#   "transformers>=4.51",
-#   "peft>=0.13",
-#   "trl>=0.12",
-#   "datasets>=3.0",
+#   "transformers==4.57.6",
+#   "peft==0.17.1",
+#   "trl==0.25.0",
+#   "datasets>=3.0,<5",
 #   "accelerate>=1.0",
 #   "bitsandbytes>=0.44",
 #   "huggingface_hub>=0.26",
 # ]
 # ///
 
+# NOTE: versions figées volontairement. transformers 5.x a supprimé
+# `warmup_ratio` de TrainingArguments, ce qui casse SFTConfig. Un job GPU
+# qui plante après 19 minutes coûte de l'argent : on ne laisse pas les
+# dépendances flotter.
+
 from __future__ import annotations
 
+import dataclasses
+import inspect
 import json
 import os
 import re
@@ -49,6 +56,9 @@ DATASET_TRAVAIL = os.environ["DATASET_TRAVAIL"]  # dataset préparé, poussé su
 DEPOT_SORTIE = os.environ["DEPOT_SORTIE"]  # où publier l'adaptateur
 
 N_EVAL = int(os.environ.get("N_EVAL", "150"))
+#: Baseline déjà mesurée lors d'un run précédent : évite de repayer 19 min de
+#: GPU pour un résultat connu. Vide = on la recalcule.
+BASELINE_CONNUE = os.environ.get("BASELINE_CONNUE", "")
 EPOQUES = float(os.environ.get("EPOQUES", "2"))
 LORA_R = int(os.environ.get("LORA_R", "16"))
 LORA_ALPHA = int(os.environ.get("LORA_ALPHA", "32"))
@@ -244,23 +254,28 @@ def main() -> None:
         bnb_4bit_use_double_quant=True,
     )
 
-    print("\n=== 1/3  Baseline (modèle non entraîné) ===", flush=True)
-    modele = AutoModelForCausalLM.from_pretrained(
-        MODELE_BASE,
-        quantization_config=quantification,
-        dtype=torch.bfloat16,
-        device_map="auto",
-    )
-    sorties_base = generer(modele, tokenizer, prompts_test)
-    baseline = evaluer(sorties_base, refs_test)
-    print("BASELINE :", json.dumps(baseline, indent=2), flush=True)
-    (SORTIE / "baseline.json").write_text(json.dumps(baseline, indent=2))
-    (SORTIE / "sorties_baseline.jsonl").write_text(
-        "\n".join(json.dumps({"sortie": s}, ensure_ascii=False) for s in sorties_base)
-    )
+    if BASELINE_CONNUE:
+        print("\n=== 1/3  Baseline reprise d'un run précédent ===", flush=True)
+        baseline = json.loads(BASELINE_CONNUE)
+        print("BASELINE :", json.dumps(baseline, indent=2), flush=True)
+    else:
+        print("\n=== 1/3  Baseline (modèle non entraîné) ===", flush=True)
+        modele = AutoModelForCausalLM.from_pretrained(
+            MODELE_BASE,
+            quantization_config=quantification,
+            dtype=torch.bfloat16,
+            device_map="auto",
+        )
+        sorties_base = generer(modele, tokenizer, prompts_test)
+        baseline = evaluer(sorties_base, refs_test)
+        print("BASELINE :", json.dumps(baseline, indent=2), flush=True)
+        (SORTIE / "sorties_baseline.jsonl").write_text(
+            "\n".join(json.dumps({"sortie": s}, ensure_ascii=False) for s in sorties_base)
+        )
+        del modele
+        torch.cuda.empty_cache()
 
-    del modele
-    torch.cuda.empty_cache()
+    (SORTIE / "baseline.json").write_text(json.dumps(baseline, indent=2))
 
     print("\n=== 2/3  Fine-tuning LoRA ===", flush=True)
 
@@ -300,21 +315,32 @@ def main() -> None:
         ],
     )
 
-    config = SFTConfig(
-        output_dir=str(SORTIE / "adapter"),
-        num_train_epochs=EPOQUES,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=8,
-        learning_rate=2e-4,
-        lr_scheduler_type="cosine",
-        warmup_ratio=0.03,
-        logging_steps=10,
-        save_strategy="no",
-        bf16=True,
-        max_length=LONGUEUR_MAX,
-        gradient_checkpointing=True,
-        report_to=[],
-    )
+    # Les versions de transformers/TRL changent régulièrement de signature.
+    # On ne passe que les paramètres réellement acceptés : un job GPU qui
+    # plante sur un TypeError coûte de l'argent.
+    voulus = {
+        "output_dir": str(SORTIE / "adapter"),
+        "num_train_epochs": EPOQUES,
+        "per_device_train_batch_size": 1,
+        "gradient_accumulation_steps": 8,
+        "learning_rate": 2e-4,
+        "lr_scheduler_type": "cosine",
+        "warmup_ratio": 0.03,
+        "logging_steps": 10,
+        "save_strategy": "no",
+        "bf16": True,
+        "max_length": LONGUEUR_MAX,
+        "gradient_checkpointing": True,
+        "report_to": [],
+    }
+    acceptes = set(inspect.signature(SFTConfig.__init__).parameters)
+    if "kwargs" in acceptes:  # dataclass héritée : on teste par construction
+        acceptes = {c.name for c in dataclasses.fields(SFTConfig)}
+    retenus = {k: v for k, v in voulus.items() if k in acceptes}
+    ignores = sorted(set(voulus) - set(retenus))
+    if ignores:
+        print(f"Paramètres non supportés par cette version, ignorés : {ignores}", flush=True)
+    config = SFTConfig(**retenus)
 
     entraineur = SFTTrainer(
         model=modele,
