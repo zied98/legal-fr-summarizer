@@ -18,6 +18,15 @@ api.upload_file(
 print("Model card publiée")
 
 api.upload_file(
+    path_or_fileobj=str(RACINE / "eval" / "benchmark.json"),
+    path_in_repo="benchmark.json",
+    repo_id="ZiedBz/legal-fr-cassation-qwen3-4b-lora",
+    repo_type="model",
+    commit_message="bench: comparaison a 5 modeles jusqu a 32B",
+)
+print("Benchmark publié")
+
+api.upload_file(
     path_or_fileobj=str(RACINE / "DATASET_CARD.md"),
     path_in_repo="README.md",
     repo_id="ZiedBz/legal-fr-cassation-sft",

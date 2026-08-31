@@ -40,7 +40,9 @@ from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 MODELE_BASE = os.environ.get("MODELE_BASE", "Qwen/Qwen3-4B-Instruct-2507")
-ADAPTATEUR = os.environ["ADAPTATEUR"]
+#: Adaptateur LoRA optionnel. Vide = on évalue le modèle de base seul, ce qui
+#: permet d'utiliser ce script pour benchmarker des modèles concurrents.
+ADAPTATEUR = os.environ.get("ADAPTATEUR", "").strip()
 DATASET_TRAVAIL = os.environ["DATASET_TRAVAIL"]
 DEPOT_SORTIE = os.environ.get("DEPOT_SORTIE", "")
 
@@ -174,7 +176,8 @@ def evaluer(sorties: list[str], references: list[dict]) -> dict:
 
 
 def main() -> None:
-    print(f"Adaptateur          : {ADAPTATEUR}")
+    print(f"Modèle              : {MODELE_BASE}")
+    print(f"Adaptateur          : {ADAPTATEUR or '(aucun — modèle de base)'}")
     print(f"max_new_tokens      : {MAX_NOUVEAUX_TOKENS}")
     print(f"repetition_penalty  : {REPETITION_PENALTY}", flush=True)
 
@@ -197,9 +200,12 @@ def main() -> None:
     modele = AutoModelForCausalLM.from_pretrained(
         MODELE_BASE, quantization_config=quant, dtype=torch.bfloat16, device_map="auto"
     )
-    modele = PeftModel.from_pretrained(modele, ADAPTATEUR)
+    if ADAPTATEUR:
+        modele = PeftModel.from_pretrained(modele, ADAPTATEUR)
+        print("Adaptateur chargé.", flush=True)
+    else:
+        print("Aucun adaptateur — évaluation du modèle de base.", flush=True)
     modele.eval()
-    print("Adaptateur chargé.", flush=True)
 
     sorties: list[str] = []
     lot = 4
@@ -231,18 +237,26 @@ def main() -> None:
         print(f"  généré {min(debut + lot, len(prompts))}/{len(prompts)}", flush=True)
 
     resultat = evaluer(sorties, refs)
+    resultat["modele"] = MODELE_BASE
+    resultat["adaptateur"] = ADAPTATEUR or None
     resultat["max_new_tokens"] = MAX_NOUVEAUX_TOKENS
     resultat["repetition_penalty"] = REPETITION_PENALTY
     print("\nRESULTAT_V2 :", json.dumps(resultat, indent=2), flush=True)
 
-    (SORTIE / "resultats_generation_v2.json").write_text(json.dumps(resultat, indent=2))
-    (SORTIE / "sorties_v2.jsonl").write_text(
+    # Suffixe dérivé du modèle : les jobs tournent en parallèle et publient
+    # dans le même dépôt, ils ne doivent pas s'écraser mutuellement.
+    slug = os.environ.get("SLUG", MODELE_BASE.split("/")[-1].lower())
+    f_res = f"bench_{slug}.json"
+    f_out = f"bench_{slug}_sorties.jsonl"
+
+    (SORTIE / f_res).write_text(json.dumps(resultat, indent=2))
+    (SORTIE / f_out).write_text(
         "\n".join(json.dumps({"sortie": s}, ensure_ascii=False) for s in sorties)
     )
 
     if DEPOT_SORTIE:
         api = HfApi()
-        for f in ("resultats_generation_v2.json", "sorties_v2.jsonl"):
+        for f in (f_res, f_out):
             api.upload_file(
                 path_or_fileobj=str(SORTIE / f),
                 path_in_repo=f,

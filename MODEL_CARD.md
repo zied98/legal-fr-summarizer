@@ -63,6 +63,44 @@ cabinet.
 Même adaptateur, même jeu de test de 100 arrêts : seuls les paramètres de
 génération changent.
 
+### Comparaison avec des modèles de base plus gros
+
+Même jeu de test (100 arrêts jamais vus), même prompt, mêmes paramètres de
+génération, quantification 4-bit pour tous.
+
+| Modèle | Taille | JSON valide | Solution | **Formation** | Articles | Résumé |
+|---|---|---|---|---|---|---|
+| Qwen3-4B base | 4B | 100 % | 93,3 % | 0 % | 6,7 % | 22,5 % |
+| Qwen3-14B | 14B | 95 % | 81,1 % | 0 % | 8,0 % | 22,7 % |
+| Mistral-Small-24B | 24B | 100 % | 95,0 % | 16 % | 11,5 % | 25,7 % |
+| Qwen3-32B | 32B | 86 % | 94,2 % | 0 % | 9,9 % | 22,4 % |
+| **Ce modèle (LoRA)** | **4B** | **100 %** | **97,0 %** | **100 %** | **25,2 %** | **52,4 %** |
+
+**Ce qu'on observe :**
+
+1. **La taille ne résout pas le problème du format.** De 4B à 32B, la
+   formation reste à 0 %. Aucun modèle généraliste ne connaît les conventions
+   de nommage de la Cour de cassation — ce n'est pas une question de capacité
+   de raisonnement, mais de convention métier.
+
+2. **Plus gros n'est pas toujours mieux.** Le 14B fait *pire* que le 4B sur la
+   solution (81,1 % contre 93,3 %), et le 32B produit le *moins* de JSON valide
+   (86 %) : les grands modèles respectent moins volontiers un format imposé.
+
+3. **Tous comprennent le droit** (solution exacte entre 81 % et 95 %) mais
+   aucun ne sait produire la fiche attendue.
+
+4. **Mistral-Small-24B est le seul modèle de base** à deviner quelques
+   formations (16 %) — réputation méritée sur le français, mais loin des 100 %.
+
+> ⚠️ **Limite de ce benchmark.** Il mesure l'**adéquation à un format métier**,
+> pas la capacité de raisonnement juridique générale. Les modèles de base
+> n'ont pas été prompt-engineerés spécifiquement : un prompt few-shot avec des
+> exemples de fiches améliorerait probablement leurs scores. La comparaison est
+> honnête sur son périmètre, pas au-delà.
+
+Détail complet : `benchmark.json` dans ce dépôt.
+
 ### Un arbitrage, pas une amélioration
 
 La configuration **(B)** corrige intégralement la régression de validité JSON

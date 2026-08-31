@@ -1,0 +1,76 @@
+{
+  "nom": "JurisBench-FR (v0)",
+  "tache": "Synthese structuree d'arrets de la Cour de cassation en fiche JSON",
+  "jeu_de_test": "100 arrets du split test de ZiedBz/legal-fr-cassation-sft, jamais vus a l'entrainement",
+  "protocole": "Meme prompt, memes metriques, memes parametres de generation (max_new_tokens=900, repetition_penalty=1.1, do_sample=False) pour tous les modeles. Quantification 4-bit NF4.",
+  "date": "2026-08-31",
+  "modeles": [
+    {
+      "nom": "Qwen/Qwen3-4B-Instruct-2507",
+      "taille": "4B",
+      "type": "base",
+      "json_valide": 1.0,
+      "solution_exacte": 0.9333,
+      "formation_exacte": 0.0,
+      "articles_jaccard": 0.0667,
+      "resume_rouge_l": 0.2247,
+      "note": "Baseline. Mesure faite avec max_new_tokens=700."
+    },
+    {
+      "nom": "Qwen/Qwen3-14B",
+      "taille": "14B",
+      "type": "base",
+      "json_valide": 0.95,
+      "solution_exacte": 0.8105,
+      "formation_exacte": 0.0,
+      "articles_jaccard": 0.0805,
+      "resume_rouge_l": 0.2267,
+      "note": "Fait PIRE que le 4B sur la solution (81% vs 93%). Plus gros n'est pas toujours mieux sur une tache contrainte."
+    },
+    {
+      "nom": "mistralai/Mistral-Small-24B-Instruct-2501",
+      "taille": "24B",
+      "type": "base",
+      "json_valide": 1.0,
+      "solution_exacte": 0.95,
+      "formation_exacte": 0.16,
+      "articles_jaccard": 0.1154,
+      "resume_rouge_l": 0.2567,
+      "note": "Seul modele de base a deviner quelques formations (16%). Reputation meritee sur le francais, mais loin des 100% du modele specialise."
+    },
+    {
+      "nom": "Qwen/Qwen3-32B",
+      "taille": "32B",
+      "type": "base",
+      "json_valide": 0.86,
+      "solution_exacte": 0.9419,
+      "formation_exacte": 0.0,
+      "articles_jaccard": 0.0986,
+      "resume_rouge_l": 0.2238,
+      "note": "8x plus gros que le modele specialise, et perd sur les 5 metriques. Produit aussi le MOINS de JSON valide (86%) : les gros modeles respectent moins un format impose."
+    },
+    {
+      "nom": "ZiedBz/legal-fr-cassation-qwen3-4b-lora",
+      "taille": "4B",
+      "type": "LoRA fine-tune",
+      "json_valide": 1.0,
+      "solution_exacte": 0.97,
+      "formation_exacte": 1.0,
+      "articles_jaccard": 0.252,
+      "resume_rouge_l": 0.5237,
+      "note": "GAGNE SUR LES 5 METRIQUES. Cout d'entrainement : ~2 USD, 1h08 sur un L40S, 3000 exemples."
+    }
+  ],
+  "conclusions": [
+    "La taille ne resout pas le probleme du format : de 4B a 32B, la formation reste a 0%. Aucun modele generaliste ne connait les conventions de nommage de la Cour de cassation. Ce n'est pas une question de capacite de raisonnement mais de convention metier.",
+    "Plus gros n'est pas toujours mieux : le 14B fait pire que le 4B sur la solution (81% vs 93%), et le 32B produit le moins de JSON valide (86%).",
+    "Tous les modeles de base comprennent le droit (solution exacte 81-95%) mais aucun ne sait produire la fiche attendue. Le fine-tuning n'apprend pas le raisonnement, il apprend le format.",
+    "Un fine-tuning cible a ~2 USD surpasse des modeles 8x plus gros, avec une latence et un cout d'inference bien inferieurs, et la possibilite de tourner on-premise sur un GPU unique."
+  ],
+  "limites": [
+    "Benchmark mono-tache : il mesure l'adequation a un format metier precis, pas la capacite de raisonnement juridique generale. Un modele generaliste n'est pas concu pour deviner les conventions de la Cour.",
+    "Les modeles de base n'ont pas ete prompt-engineeres specifiquement : un prompt few-shot avec des exemples de fiches ameliorerait probablement leurs scores.",
+    "Baseline 4B mesuree avec max_new_tokens=700, les autres avec 900. Ecart mineur mais reel.",
+    "Un seul run par modele, pas de moyenne sur plusieurs seeds (generation gloutonne, donc deterministe)."
+  ]
+}
