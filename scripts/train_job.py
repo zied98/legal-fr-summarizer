@@ -353,9 +353,38 @@ def main() -> None:
     entraineur.save_model(str(SORTIE / "adapter"))
     print("Adaptateur sauvegardé.", flush=True)
 
+    # Publication IMMÉDIATE de l'adaptateur, avant toute autre étape.
+    # Un artefact qui a coûté une heure de GPU ne doit jamais dépendre
+    # de la réussite des étapes suivantes.
+    api = HfApi()
+    api.create_repo(DEPOT_SORTIE, repo_type="model", exist_ok=True, private=False)
+    api.upload_folder(
+        folder_path=str(SORTIE / "adapter"),
+        repo_id=DEPOT_SORTIE,
+        repo_type="model",
+    )
+    api.upload_file(
+        path_or_fileobj=str(SORTIE / "baseline.json"),
+        path_in_repo="baseline.json",
+        repo_id=DEPOT_SORTIE,
+        repo_type="model",
+    )
+    print(f"✅ Adaptateur publié : https://huggingface.co/{DEPOT_SORTIE}", flush=True)
+
     print("\n=== 3/3  Évaluation du modèle entraîné ===", flush=True)
     modele_ft = entraineur.model
-    sorties_ft = generer(modele_ft, tokenizer, prompts_test)
+    modele_ft.config.use_cache = True
+    # Après entraînement, certaines couches (dont lm_head) sont repassées en
+    # float32 par le Trainer tandis que les états cachés restent en bfloat16.
+    # torch.autocast réconcilie les deux au moment de la génération.
+    try:
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            sorties_ft = generer(modele_ft, tokenizer, prompts_test)
+    except RuntimeError as err:
+        # L'adaptateur est déjà publié : on ne perd pas l'entraînement.
+        print(f"⚠️  Génération impossible ({err}) — repli en float32.", flush=True)
+        modele_ft = modele_ft.float()
+        sorties_ft = generer(modele_ft, tokenizer, prompts_test)
     finetune = evaluer(sorties_ft, refs_test)
     print("FINE-TUNÉ :", json.dumps(finetune, indent=2), flush=True)
 
@@ -379,10 +408,16 @@ def main() -> None:
     )
     print("\nCOMPARAISON :", json.dumps(comparaison, indent=2), flush=True)
 
-    print("\n=== Publication sur le Hub ===", flush=True)
-    api = HfApi()
-    api.create_repo(DEPOT_SORTIE, repo_type="model", exist_ok=True, private=False)
-    api.upload_folder(folder_path=str(SORTIE), repo_id=DEPOT_SORTIE, repo_type="model")
+    print("\n=== Publication des résultats ===", flush=True)
+    for fichier in ("resultats.json", "sorties_finetune.jsonl"):
+        chemin = SORTIE / fichier
+        if chemin.exists():
+            api.upload_file(
+                path_or_fileobj=str(chemin),
+                path_in_repo=fichier,
+                repo_id=DEPOT_SORTIE,
+                repo_type="model",
+            )
     print(f"Publié : https://huggingface.co/{DEPOT_SORTIE}", flush=True)
 
 
