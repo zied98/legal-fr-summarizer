@@ -34,6 +34,46 @@ def normaliser_formation(valeur: str) -> str:
     return valeur.replace("_", " ").strip().capitalize()
 
 
+#: Solutions canoniques de la Cour de cassation. Le dataset source contient
+#: des variantes de casse ("Rejet" / "REJET") et des valeurs composites
+#: issues d'arrêts multi-pourvois mal aplatis.
+SOLUTIONS_CANONIQUES = (
+    "Cassation partielle sans renvoi",
+    "Cassation partielle",
+    "Cassation sans renvoi",
+    "Cassation",
+    "Rejet",
+    "Irrecevabilité",
+    "Annulation",
+    "Non-lieu à statuer",
+    "Déchéance",
+)
+
+
+def normaliser_solution(valeur: str) -> str:
+    """Ramène le sens de la décision à une valeur canonique.
+
+    Retourne "" si la valeur est composite (arrêt multi-pourvois) ou
+    inconnue : ces exemples sont écartés plutôt qu'appris de travers.
+    """
+    if not valeur:
+        return ""
+    brut = " ".join(valeur.split())
+    bas = brut.lower()
+
+    correspondances = [c for c in SOLUTIONS_CANONIQUES if c.lower() in bas]
+    if not correspondances:
+        return ""
+
+    # Une valeur composite comme "Cassation partielle REJET Cassation" cite
+    # plusieurs solutions distinctes : on l'écarte.
+    racines = {c.split()[0].lower() for c in correspondances}
+    if len(racines) > 1:
+        return ""
+
+    return max(correspondances, key=len)
+
+
 def normaliser_articles(valeur: str) -> list[str]:
     """Découpe le champ applied_laws en liste de textes visés."""
     if not valeur:
