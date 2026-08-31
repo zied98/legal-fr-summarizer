@@ -1,0 +1,46 @@
+{
+  "modele_base": "Qwen/Qwen3-4B-Instruct-2507",
+  "adaptateur": "ZiedBz/legal-fr-cassation-qwen3-4b-lora",
+  "dataset": "ZiedBz/legal-fr-cassation-sft",
+  "n_train": 3000,
+  "epoques": 1,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "quantification": "QLoRA 4-bit nf4",
+  "materiel": "1x NVIDIA L40S 48GB",
+  "duree_entrainement": "1h08",
+  "cout_gpu_usd": 2.1,
+  "baseline": {
+    "n": 150,
+    "json_valide": 1.0,
+    "schema_valide": 1.0,
+    "solution_exacte": 0.9333,
+    "formation_exacte": 0.0,
+    "articles_jaccard": 0.0667,
+    "resume_rouge_l": 0.2247
+  },
+  "finetune": {
+    "n": 100,
+    "json_valide": 0.95,
+    "schema_valide": 0.95,
+    "solution_exacte": 0.9684,
+    "formation_exacte": 1.0,
+    "articles_jaccard": 0.3237,
+    "resume_rouge_l": 0.5497
+  },
+  "delta": {
+    "json_valide": -0.05,
+    "schema_valide": -0.05,
+    "solution_exacte": 0.0351,
+    "formation_exacte": 1.0,
+    "articles_jaccard": 0.257,
+    "resume_rouge_l": 0.325
+  },
+  "limites_connues": [
+    "Regression de 5 points sur la validite JSON : hypothese la plus probable = resumes plus longs atteignant la limite de 700 tokens de generation, tronquant le JSON. Corrigeable en augmentant max_new_tokens.",
+    "Jaccard sur les articles vises reste bas (0.32) : le format des visas est tres heterogene dans le corpus source.",
+    "Solution deja a 93% en baseline : peu de marge de progression mesurable.",
+    "Evaluation sur 100 arrets (fine-tune) vs 150 (baseline) : legere difference d'echantillon.",
+    "ROUGE-L ne capture pas les reformulations correctes ; complete par inspection manuelle."
+  ]
+}
