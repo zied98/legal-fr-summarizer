@@ -37,7 +37,8 @@
     "resume_rouge_l": 0.325
   },
   "limites_connues": [
-    "Regression de 5 points sur la validite JSON : hypothese la plus probable = resumes plus longs atteignant la limite de 700 tokens de generation, tronquant le JSON. Corrigeable en augmentant max_new_tokens.",
+    "Regression de 5 points sur la validite JSON, CAUSE CONFIRMEE par inspection manuelle : les 5 sorties non parsables font 2100-2600 caracteres et sont tronquees a la limite de 700 tokens. L'echec #78 montre une degenerescence par repetition en boucle ('il a ete tenu pour certain que l'expropriation devait intervenir' repete). Correctifs : repetition_penalty=1.1 et/ou augmenter max_new_tokens.",
+    "Erreur d'article vise observee en inspection : sur un arret fiscal, le modele cite 'article 691 du CGI' la ou la reference attend 'article 1594-0 G, A'. Le raisonnement est correct mais le visa est faux. En usage reel c'est la limite la plus critique : un mauvais numero d'article est plus grave qu'un resume approximatif.",
     "Jaccard sur les articles vises reste bas (0.32) : le format des visas est tres heterogene dans le corpus source.",
     "Solution deja a 93% en baseline : peu de marge de progression mesurable.",
     "Evaluation sur 100 arrets (fine-tune) vs 150 (baseline) : legere difference d'echantillon.",
