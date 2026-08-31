@@ -1,0 +1,23 @@
+[project]
+name = "legal-fr-summarizer"
+version = "0.1.0"
+description = "Fine-tuning LoRA pour la synthèse structurée d'arrets de la Cour de cassation"
+requires-python = ">=3.10"
+dependencies = [
+    "datasets>=2.19",
+    "huggingface-hub>=0.24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+train = ["torch", "transformers>=4.44", "peft>=0.12", "trl>=0.9", "bitsandbytes", "accelerate"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
